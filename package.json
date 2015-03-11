@@ -1,0 +1,15 @@
+{
+  "name": "flavor-scraper",
+  "version": "1.0.0",
+  "description": "extract information from static pricing HTML",
+  "main": "bin/parse-data.coffee",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "author": "ayan4m1 <andrew@bulletlogic.com>",
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^0.18.0",
+    "p-promise": "^0.5.0"
+  }
+}
