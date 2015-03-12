@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "extract information from static pricing HTML",
   "main": "bin/parse-data.coffee",
+  "repository": "https://github.com/ayan4m1/flavor-scraper",
   "scripts": {
     "test": "gulp test"
   },
@@ -10,6 +11,8 @@
   "license": "MIT",
   "dependencies": {
     "cheerio": "^0.18.0",
+    "js-quantities": "^1.5.0",
+    "jsonfile": "^2.0.0",
     "p-promise": "^0.5.0"
   }
 }

@@ -2,13 +2,15 @@
 
 fs = require 'fs'
 p = require 'p-promise'
+json = require 'jsonfile'
 cheerio = require 'cheerio'
+Qty = require 'js-quantities'
 
 readFile = p.denodeify fs.readFile
-writeFile = p.denodeify fs.writeFile
+writeFile = p.denodeify json.writeFile
 
 outputData = (data) ->
-  writeFile('result.json', JSON.stringify data)
+  writeFile('result.json', data)
 
 parseDocument = (doc) ->
   $ = cheerio.load doc
@@ -20,9 +22,16 @@ parseDocument = (doc) ->
     name: $(v).find('h4 a').text()
     prices: elem.find('.variants li a').map (i, v) ->
       text = $(v).text().split(' - ')
+      volumeQty = Qty.parse(text[0].replace(/oz/, ' floz'))
+      price = null
+      for rawPrice in text.slice(1)
+        break if price isnt null
+        parsedPrice = rawPrice.replace /[a-zA-Z\(\)\s\$]/g, ''
+        continue unless parsedPrice.indexOf('.') > -1 and parseFloat(parsedPrice)
+        price = parsedPrice
 
-      volume: text[0]
-      price: text[1]
+      volume: if volumeQty is null then text[0] else volumeQty.to('l').toPrec('1 floz').toString()
+      price: price
     .get()
   .get()
 
@@ -33,7 +42,6 @@ for file in ['./bulk1.html', './bulk2.html', './bulk3.html']
       .then parseDocument, (err) -> console.error err
   )
 
-console.log promises
 p.all(promises)
   .then outputData, (err) -> console.error err
 .done()
