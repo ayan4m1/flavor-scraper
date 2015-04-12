@@ -68,7 +68,7 @@ readProductList = (doc) ->
 
     # return an object representing the product info
     id: elem.find('a[name]').attr('name')
-    supplier: 'TFA'
+    vendor: 'tfa'
     name: sanitizeFlavorName $(v).find('h4 a').text()
     prices: options.map(mapPrices).get()
 
@@ -181,7 +181,6 @@ lookupDetails = (flavor) ->
   deferred.promise
 
 module.exports = parsers.create
-  name: 'tfa'
   getFlavors: ->
     # one promise per page of products
     files = ['./bulk1.html', './bulk2.html', './bulk3.html']
