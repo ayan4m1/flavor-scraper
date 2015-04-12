@@ -96,7 +96,7 @@ readProductList = (doc) ->
     # search through remaining tokens for a potential USD price
     price = null
     for rawPrice in text.slice(1)
-      parsedPrice = rawPrice.replace /[a-z\(\)\s\$]/gi, ''
+      parsedPrice = rawPrice.replace /[a-z\(\)\s\$\,]/gi, ''
       continue unless parsedPrice.indexOf('.') > -1 and parseFloat(parsedPrice)
       price = parseFloat(parsedPrice)
       break if price isnt null
