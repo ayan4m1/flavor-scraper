@@ -14,9 +14,11 @@
     "delayed": "^1.0.1",
     "js-quantities": "^1.5.0",
     "jsonfile": "^2.0.0",
+    "konfig": "^0.2.1",
     "merge": "^1.2.0",
     "p-promise": "^0.5.0",
-    "pg-redis": "0.0.2",
+    "pg-native": "^1.8.0",
+    "pg-redis": "^0.0.4",
     "request-promise": "^0.4.1"
   }
 }
