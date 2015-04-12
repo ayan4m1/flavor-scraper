@@ -48,8 +48,17 @@ unitTransforms = [
 ]
 
 sanitizeFlavorName = (name) -> name.replace(/\s+\*+$/, '').trim()
+sanitizeComponentName = (name) ->
+  name.split(/\s+/).reduce (prev, cur) ->
+    "#{prev} #{cur.substr(0, 1).toUpperCase()}#{cur.substr(1).toLowerCase()}"
+  , "" # initial value is an empty string to process first value correctly
 
-parseDocument = (doc) ->
+# get a normal distribution of randomness for our delay
+gaussianRandom = ->
+  rand = Math.random
+  Math.abs((rand() + rand() + rand() + rand() + rand() + rand() - 3) / 3)
+
+readProductList = (doc) ->
   $ = cheerio.load doc
 
   mapProducts = (i, v) ->
@@ -108,12 +117,13 @@ lookupSpecs = (pages) ->
   flavors = []
   flavors = flavors.concat.apply flavors, pages
 
-  console.log "looking up specs for #{flavors.length} tfa flavors"
+  console.log "parsing details for #{flavors.length} flavors"
 
   request detailListUri
   .then (doc) ->
     $ = cheerio.load doc
 
+    # extract product specific metadata from the cells in each row
     mapDetails = (i, v) ->
       cells = $(v).find('td')
 
@@ -125,25 +135,23 @@ lookupSpecs = (pages) ->
     # the product table doesn't have an id attribute, so we have to use this somewhat brittle fallback
     # also need to skip the header row, not in a <thead> so we have to hope it's always first
     rows = $('.content table').last().find('tr').not(':first-child')
-
-    # map product details into an object array
     details = rows.map(mapDetails).get()
 
-    # add details information to existing flavor object
-    # because the spec list page does not have IDs, we have to do a name comparison
-    result = {}
-    for flavor in flavors
-      hash = "#{flavor.supplier.toLowerCase()}-#{flavor.id}"
+    # resolve promise by joining flavor and detail arrays together
+    # because the spec list page does not have page IDs,
+    # we have to use a nested loop to match things up by name
+    result = flavors.map (flavor) ->
       for detail in details
         continue unless flavor.name is detail.name
-        console.log "added tfa flavor #{hash} - #{flavor.name}"
-        result[hash] = merge flavor, detail
+        return merge flavor, detail
+      flavor
 
     deferred.resolve result
   .catch (err) -> deferred.reject err
 
   deferred.promise
 
+# query the product specific component list
 lookupDetails = (flavor) ->
   deferred = p.defer()
 
@@ -156,21 +164,19 @@ lookupDetails = (flavor) ->
         cells = $(v).find('td')
 
         # return an object with mapped information from this page
-        name: $(cells.get(0)).text().trim()
+        name: sanitizeComponentName $(cells.get(0)).text().trim()
         casNumber: $(cells.get(1)).text().trim()
         percentage: $(cells.get(2)).text().trim()
         description: $(cells.get(3)).text().trim()
 
-      console.log "parsing components for #{flavor.name}"
-
-      rows = $('#ctl00_PageContent_componentList > table').find('tr').not(':first-child')
+      rows = $('#ctl00_PageContent_componentList').find('table').find('tr').not(':first-child')
       components = rows.map(mapComponents).get()
 
-      console.log "found #{components.length} components"
+      console.log "parsed #{components.length} components for #{flavor.name}"
 
       deferred.resolve merge flavor, {components: components}
     .catch (err) -> deferred.reject err
-  , (Math.random() * 20000) + 250 # fuzzy random delay
+  , (gaussianRandom() * 20000) + 250 # fuzzy random delay
 
   deferred.promise
 
@@ -180,16 +186,14 @@ module.exports = parsers.create
     # one promise per page of products
     files = ['./bulk1.html', './bulk2.html', './bulk3.html']
     promises = []
-    for file in files
-      promises.push readFile(file).then(parseDocument, (err) -> console.error err)
+    promises.push(readFile(file).then(readProductList)) for file in files
 
     # return promise to parse each document and then look up product details
-    p.all(promises).then lookupSpecs, (err) -> console.error err
+    p.all(promises).then(lookupSpecs)
   getDetails: (flavors) ->
     # one promise per flavor
     promises = []
-    for hash, flavor of flavors
-      promises.push lookupDetails(flavor)
+    promises.push(lookupDetails(flavor)) for flavor in flavors
 
     # return promise to fetch components for each flavor
     p.all(promises)
