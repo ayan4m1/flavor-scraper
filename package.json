@@ -16,6 +16,7 @@
     "jsonfile": "^2.0.0",
     "merge": "^1.2.0",
     "p-promise": "^0.5.0",
+    "pg-redis": "0.0.2",
     "request-promise": "^0.4.1"
   }
 }
