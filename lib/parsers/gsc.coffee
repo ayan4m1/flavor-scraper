@@ -70,8 +70,8 @@ componentQueue = queues.create
 fetchPage = (code) ->
   fetched = p.defer()
 
-    request "#{baseUri}/allprd-#{code}.htm"
   pageQueue.queue ->
+    request "#{baseUri}/allprd-#{code}.htm"
     .then (doc) ->
       $ = cheerio.load doc
 
