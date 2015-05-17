@@ -2,11 +2,11 @@
 p = require 'p-promise'
 json = require 'jsonfile'
 
-parserDir = '../lib/parsers'
+parserWithName = (name) -> "../lib/parsers/#{name}"
 
 # register parsers
 parsers = [
-  require "#{parserDir}/tfa"
+  require parserWithName('tfa')
 ]
 
 # invoke the parsers
