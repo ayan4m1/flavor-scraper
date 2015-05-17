@@ -9,9 +9,6 @@ lib = glob('lib')
 src = glob('src')
 test = glob('test')
 
-gulp.task 'run', ->
-
-
 gulp.task 'build', ->
   gulp.src([lib, src])
   .pipe(coffee({ bare: true }))
