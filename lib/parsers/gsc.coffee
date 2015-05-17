@@ -6,6 +6,7 @@ Qty = require 'js-quantities'
 request = require 'request-promise'
 
 parsers = require '../parser'
+queues = require '../queue'
 
 # todo: do this inline
 # one-liner to get pages:
@@ -57,11 +58,20 @@ pageCodes = [
   'zaa'
 ]
 
+pageQueue = queues.create
+  totalRequests: pageCodes.length
+  loadFactor: 4
+  delay: 250
+
+componentQueue = queues.create
+  loadFactor: 20
+  delay: 500
+
 fetchPage = (code) ->
   fetched = p.defer()
 
-  parsers.fuzzyDelay 250, 10000, pageCodes.length, ->
     request "#{baseUri}/allprd-#{code}.htm"
+  pageQueue.queue ->
     .then (doc) ->
       $ = cheerio.load doc
 
@@ -91,7 +101,8 @@ fetchPage = (code) ->
 fetchDetails = (component, componentCount) ->
   fetched = p.defer()
 
-  parsers.fuzzyDelay 1000, 240000, componentCount, ->
+  componentQueue.totalRequests = componentCount
+  componentQueue.queue ->
     request "#{baseUri}/data/#{component.id}.html"
     .then (doc) ->
       console.log "got details for #{component.name}"
@@ -102,7 +113,7 @@ fetchDetails = (component, componentCount) ->
       rows = $('#chemdata').find('tr')
       details =
         name: $(rows.get(0)).find('a').text().replace(/\(Click\)/g, '').trim()
-        casNumber: $(rows.get(1)).find('a').text().trim()
+        casNumber: $(rows.get(1)).find('a').text().replace(/\(Click\)/g, '').trim()
         synonyms: $('#rhtable tr[itemscope]').map(mapSynonyms).get()
 
       fetched.resolve merge(component, details)
@@ -128,3 +139,8 @@ module.exports = parsers.create
     promises.push(fetchDetails(component, components.length)) for component in components
 
     p.allSettled promises
+    .then (results) ->
+      # cull any broken promises
+      results
+        .filter (v) -> v.state is 'fulfilled'
+        .map (v) -> v.value

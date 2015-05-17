@@ -11,12 +11,6 @@ class Parser
   } = options
 
 module.exports =
-  fuzzyDelay: (min, max, requests = 1, cb) ->
-    quant = (max - min) / requests
-    scalar = Math.ceil(max / quant)
-    delay = (Math.random() *  scalar * quant) + min
-
-    delayed.delay cb, delay
   # remove special characters and the word "flavor" from all flavor names, and try to clean up whitespace
   stripSpecials: (name) -> name.replace(/[*-]+|Flavor/g, '').replace(/\s+/g, ' ').trim()
   properCase: (name) ->

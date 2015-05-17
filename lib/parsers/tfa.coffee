@@ -6,6 +6,7 @@ Qty = require 'js-quantities'
 request = require 'request-promise'
 
 parsers = require '../parser'
+queues = require '../queue'
 
 readFile = p.denodeify fs.readFile
 
@@ -13,6 +14,11 @@ volumeUnit = 'ml'
 baseUri = 'http://shop.perfumersapprentice.com'
 detailListUri = "#{baseUri}/specsheetlist.aspx"
 componentListUri = (flavor) -> "#{baseUri}/componentlist.aspx?sku_search=#{flavor.sku}"
+
+# todo: remove magic numbers
+queue = queues.create
+  loadFactor: 20
+  delay: 500
 
 unitTransforms = [
   regex: /^double case \(8\) 2 week lead time$/
@@ -140,10 +146,11 @@ fetchSpecs = (pages) ->
   deferred.promise
 
 # query the product specific component list
-fetchDetails = (flavor) ->
+fetchDetails = (flavor, flavorCount) ->
   deferred = p.defer()
 
-  parsers.fuzzyDelay 500, 5000, 200, ->
+  queue.totalRequests = flavorCount
+  queue.queue ->
     request componentListUri(flavor)
     .then (doc) ->
       $ = cheerio.load doc
@@ -181,7 +188,7 @@ module.exports = parsers.create
   getDetails: (flavors) ->
     # one promise per flavor
     promises = []
-    promises.push(fetchDetails(flavor)) for flavor in flavors
+    promises.push(fetchDetails(flavor, flavors.length)) for flavor in flavors
 
     # return promise to fetch components for each flavor
     p.all promises
