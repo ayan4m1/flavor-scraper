@@ -1,7 +1,6 @@
 fs = require 'fs'
 p = require 'p-promise'
 merge = require 'merge'
-delayed = require 'delayed'
 cheerio = require 'cheerio'
 Qty = require 'js-quantities'
 request = require 'request-promise'
@@ -47,17 +46,6 @@ unitTransforms = [
   result: '576ml'
 ]
 
-sanitizeFlavorName = (name) -> name.replace(/\s+\*+$/, '').trim()
-sanitizeComponentName = (name) ->
-  name.split(/\s+/).reduce (prev, cur) ->
-    "#{prev} #{cur.substr(0, 1).toUpperCase()}#{cur.substr(1).toLowerCase()}"
-  , "" # initial value is an empty string to process first value correctly
-
-# get a normal distribution of randomness for our delay
-gaussianRandom = ->
-  rand = Math.random
-  Math.abs((rand() + rand() + rand() + rand() + rand() + rand() - 3) / 3)
-
 readProductList = (doc) ->
   $ = cheerio.load doc
 
@@ -69,7 +57,7 @@ readProductList = (doc) ->
     # return an object representing the product info
     id: elem.find('a[name]').attr('name')
     vendor: 'tfa'
-    name: sanitizeFlavorName $(v).find('h4 a').text()
+    name: parsers.stripSpecials $(v).find('h4 a').text()
     prices: options.map(mapPrices).get()
 
   mapPrices = (i, v) ->
@@ -110,7 +98,7 @@ readProductList = (doc) ->
   $('.productBlock').map(mapProducts).get()
 
 # query the MSDS/spec sheet page and look up extra information
-lookupSpecs = (pages) ->
+fetchSpecs = (pages) ->
   deferred = p.defer()
 
   # join the flavor pages together
@@ -128,7 +116,7 @@ lookupSpecs = (pages) ->
       cells = $(v).find('td')
 
       # return an object with mapped information from this page
-      name: sanitizeFlavorName $(cells.get(0)).text()
+      name: parsers.stripSpecials $(cells.get(0)).text()
       msdsUri: baseUri + $(cells.get(2)).find('a').attr('href')
       sku: $(cells.get(3)).find('a').attr('href').replace(/.*?=([0-9]+)/, '$1') # assumes sku is the last qs parameter
 
@@ -152,10 +140,10 @@ lookupSpecs = (pages) ->
   deferred.promise
 
 # query the product specific component list
-lookupDetails = (flavor) ->
+fetchDetails = (flavor) ->
   deferred = p.defer()
 
-  delayed.delay ->
+  parsers.fuzzyDelay 500, 5000, 200, ->
     request componentListUri(flavor)
     .then (doc) ->
       $ = cheerio.load doc
@@ -164,7 +152,7 @@ lookupDetails = (flavor) ->
         cells = $(v).find('td')
 
         # return an object with mapped information from this page
-        name: sanitizeComponentName $(cells.get(0)).text().trim()
+        name: parsers.properCase $(cells.get(0)).text().trim()
         casNumber: $(cells.get(1)).text().trim()
         percentage: $(cells.get(2)).text().trim()
         description: $(cells.get(3)).text().trim()
@@ -176,11 +164,11 @@ lookupDetails = (flavor) ->
 
       deferred.resolve merge flavor, {components: components}
     .catch (err) -> deferred.reject err
-  , (gaussianRandom() * 20000) + 250 # fuzzy random delay
 
   deferred.promise
 
 module.exports = parsers.create
+  name: 'tfa'
   getFlavors: ->
     # one promise per page of products
     files = ['./bulk1.html', './bulk2.html', './bulk3.html']
@@ -188,11 +176,12 @@ module.exports = parsers.create
     promises.push(readFile(file).then(readProductList)) for file in files
 
     # return promise to parse each document and then look up product details
-    p.all(promises).then(lookupSpecs)
+    p.all promises
+    .then fetchSpecs
   getDetails: (flavors) ->
     # one promise per flavor
     promises = []
-    promises.push(lookupDetails(flavor)) for flavor in flavors
+    promises.push(fetchDetails(flavor)) for flavor in flavors
 
     # return promise to fetch components for each flavor
-    p.all(promises)
+    p.all promises
