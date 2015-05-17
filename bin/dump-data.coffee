@@ -1,4 +1,6 @@
-#!/usr/bin/env coffee
+#!/bin/sh
+":" //# comment; exec /usr/bin/env coffee --nodejs --max-old-space-size=4096 "$0" "$@"
+
 p = require 'p-promise'
 json = require 'jsonfile'
 
