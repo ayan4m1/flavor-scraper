@@ -17,7 +17,7 @@
     "konfig": "^0.2.1",
     "merge": "^1.2.0",
     "p-promise": "^0.5.0",
-    "pg-native": "^1.8.0",
+    "pg": "^4.3.0",
     "pg-redis": "^0.1.0",
     "request-promise": "^0.4.1"
   },
