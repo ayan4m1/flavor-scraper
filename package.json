@@ -1,6 +1,6 @@
 {
   "name": "flavor-scraper",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "extract information from static pricing HTML",
   "main": "bin/parse-data.coffee",
   "repository": "https://github.com/ayan4m1/flavor-scraper",
