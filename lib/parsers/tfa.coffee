@@ -176,19 +176,21 @@ fetchDetails = (flavor, flavorCount) ->
 
 module.exports = parsers.create
   name: 'tfa'
-  getFlavors: ->
-    # one promise per page of products
-    files = ['./bulk1.html', './bulk2.html', './bulk3.html']
-    promises = []
-    promises.push(readFile(file).then(readProductList)) for file in files
+  processes: [
+    ->
+      # one promise per page of products
+      files = ['./bulk1.html', './bulk2.html', './bulk3.html']
+      promises = []
+      promises.push(readFile(file).then(readProductList)) for file in files
 
-    # return promise to parse each document and then look up product details
-    p.all promises
-    .then fetchSpecs
-  getDetails: (flavors) ->
-    # one promise per flavor
-    promises = []
-    promises.push(fetchDetails(flavor, flavors.length)) for flavor in flavors
+      # return promise to parse each document and then look up product details
+      p.all promises
+      .then fetchSpecs
+    , (flavors) ->
+      # one promise per flavor
+      promises = []
+      promises.push(fetchDetails(flavor, flavors.length)) for flavor in flavors
 
-    # return promise to fetch components for each flavor
-    p.all promises
+      # return promise to fetch components for each flavor
+      p.all promises
+  ]

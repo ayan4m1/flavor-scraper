@@ -4,18 +4,17 @@
 p = require 'p-promise'
 json = require 'jsonfile'
 
-writeJsonFile = p.denodeify(json.writeFile)
-parserWithName = (name) -> "../lib/parsers/#{name}"
+parsers = require '../lib/parser'
 
 # register parsers
-parsers = [
-  require parserWithName('gsc')
-  #require parserWithName('tfa')
+parserList = [
+  parsers.loadByName 'gsc'
+  #parsers.loadByName 'tfa'
 ]
 
 # invoke the parsers
-for parser in parsers
-  parser.getFlavors()
-    .then (flavors) -> parser.getDetails flavors
-    .then (flavors) -> writeJsonFile "#{parser.name}-result.json", flavors
+for parser in parserList
+  parser.process()
+  .then (data) ->
+    p.denodeify(json.writeFile)("#{parser.name}-result.json", data)
   .done()

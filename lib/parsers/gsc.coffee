@@ -88,16 +88,33 @@ fetchDetails = (component, componentCount) ->
   componentQueue.queue ->
     request "#{baseUri}/data/#{component.id}.html"
     .then (doc) ->
-      console.log "got details for #{component.name}"
       $ = cheerio.load doc
+      console.log "parsing details for #{component.name}"
+
+      # try and parse the label for this row into a hashable key
+      data = {}
+      dataKey = (label) ->
+        label.toLowerCase().trim().replace(/[^\w\d\s-]/g, '').trim().replace(/[\s_]/g, '-')
+
+      # enumerate each data row
+      $('#chemdata').find('tr').each (i, v) ->
+        cells = $(v).find('td')
+        return unless cells.length is 2
+        key = dataKey($(cells.get(0)).text())
+        value = $(cells.get(1)).text().trim()
+        # todo: make this a real exclusion list, for now this is ok
+        return if value is 'Predict' or value is 'Search'
+        data[key] = value
 
       mapSynonyms = (i, v) -> $(v).text().trim()
-
-      rows = $('#chemdata').find('tr')
       details =
-        name: $(rows.get(0)).find('a').text().replace(/\(Click\)/g, '').trim()
-        casNumber: $(rows.get(1)).find('a').text().replace(/\(Click\)/g, '').trim()
+        name: $('td.prodname').text().trim()
+        notes: $('.fotq').text().trim()
         synonyms: $('#rhtable tr[itemscope]').map(mapSynonyms).get()
+        data: data
+
+      # todo: look up flavors if a demo link is provided
+      #demoUri = $('.demstrafrm').find('a').attr('href')
 
       fetched.resolve merge(component, details)
     .catch (err) -> fetched.reject err
@@ -106,24 +123,26 @@ fetchDetails = (component, componentCount) ->
 
 module.exports = parsers.create
   name: 'gsc'
-  getFlavors: ->
-    promises = []
-    promises.push(fetchPage(pageCode)) for pageCode in pageCodes
+  processes: [
+    ->
+      promises = []
+      promises.push(fetchPage(pageCode)) for pageCode in pageCodes
 
-    p.all promises
-  getDetails: (pages) ->
-    # merge pages back into a single array
-    components = []
-    components = components.concat.apply components, pages
+      p.all promises
+    , (pages) ->
+      # merge pages back into a single array
+      components = []
+      components = components.concat.apply components, pages
 
-    console.log "found #{components.length} components in total"
+      console.log "found #{components.length} components in total"
 
-    promises = []
-    promises.push(fetchDetails(component, components.length)) for component in components
+      promises = []
+      promises.push(fetchDetails(component, components.length)) for component in components
 
-    p.allSettled promises
-    .then (results) ->
-      # cull any broken promises
-      results
-        .filter (v) -> v.state is 'fulfilled'
-        .map (v) -> v.value
+      p.allSettled promises
+      .then (results) ->
+        # cull any failed promises
+        results
+          .filter (v) -> v.state is 'fulfilled'
+          .map (v) -> v.value
+  ]

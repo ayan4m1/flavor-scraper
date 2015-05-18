@@ -10,4 +10,4 @@ class Flavor
   } = options
 
 module.exports =
-  create: (options) -> new Flavor(options)
+  create: (options) -> new Flavor options
