@@ -14,47 +14,20 @@ queues = require '../queue'
 # .each(function(i, v) { console.log($(v).attr('href')) });
 
 baseUri = 'http://www.thegoodscentscompany.com'
-pageCodes = [
-  'a'
-  'b'
-  'c'
-  'd'
-  'e'
-  'f'
-  'g'
-  'h'
-  'i'
-  'jk'
-  'l'
-  'm'
-  'n'
-  'o'
-  'p'
-  'q'
-  'r'
-  's'
-  't'
-  'u'
-  'v'
-  'wx'
-  'y'
-  'z'
-]
 
 pageQueue = queues.create
-  totalRequests: pageCodes.length
   loadFactor: 4
   delay: 250
 
-componentQueue = queues.create
+ingredientQueue = queues.create
   loadFactor: 20
   delay: 500
 
-fetchPage = (code) ->
+fetchPage = (uri) ->
   fetched = p.defer()
 
   pageQueue.queue ->
-    request "#{baseUri}/flonly-#{code}.htm"
+    request uri
     .then (doc) ->
       $ = cheerio.load doc
 
@@ -81,15 +54,15 @@ fetchPage = (code) ->
 
   fetched.promise
 
-fetchDetails = (component, componentCount) ->
+fetchDetails = (ingredient, ingredientCount) ->
   fetched = p.defer()
 
-  componentQueue.totalRequests = componentCount
-  componentQueue.queue ->
-    request "#{baseUri}/data/#{component.id}.html"
+  ingredientQueue.totalRequests = ingredientCount
+  ingredientQueue.queue ->
+    request "#{baseUri}/data/#{ingredient.id}.html"
     .then (doc) ->
       $ = cheerio.load doc
-      console.log "parsing details for #{component.name}"
+      console.log "parsing details for #{ingredient.name}"
 
       # try and parse the label for this row into a hashable key
       data = {}
@@ -111,12 +84,10 @@ fetchDetails = (component, componentCount) ->
         name: $('td.prodname').text().trim()
         notes: $('.fotq').text().trim()
         synonyms: $('#rhtable tr[itemscope]').map(mapSynonyms).get()
+        demoUri: $('.demstrafrm').find('a').attr('href').trim()
         data: data
 
-      # todo: look up flavors if a demo link is provided
-      #demoUri = $('.demstrafrm').find('a').attr('href')
-
-      fetched.resolve merge(component, details)
+      fetched.resolve merge(ingredient, details)
     .catch (err) -> fetched.reject err
 
   fetched.promise
@@ -124,24 +95,51 @@ fetchDetails = (component, componentCount) ->
 module.exports = parsers.create
   name: 'gsc'
   processes: [
-    ->
+    -> # fetch the list of flavor ingredient pages to query
+      fetched = p.defer()
+
+      request baseUri
+      .then (doc) ->
+        $ = cheerio.load doc
+
+        mapHrefs = (i, v) ->
+          # todo: cleaner way of skipping the 'href="#"'
+          href = $(v).attr('href').trim().replace('#', '')
+          if href is '' then null else href
+
+        # tab index 15 is "flonly-" or Flavor Ingredients
+        fetched.resolve $($('div.tabs').get(15)).find('li').find('a').map(mapHrefs).get()
+        #fetched.resolve ['http://www.thegoodscentscompany.com/flonly-d.htm']
+      .catch (err) ->
+        console.error err
+        fetched.reject err
+
+      fetched.promise
+    , (uris) -> # create a promise to fetch each page of ingredients
+      pageQueue.totalRequests = uris.length
+
       promises = []
-      promises.push(fetchPage(pageCode)) for pageCode in pageCodes
-
-      p.all promises
-    , (pages) ->
-      # merge pages back into a single array
-      components = []
-      components = components.concat.apply components, pages
-
-      console.log "found #{components.length} components in total"
-
-      promises = []
-      promises.push(fetchDetails(component, components.length)) for component in components
+      promises.push(fetchPage(uri)) for uri in uris
 
       p.allSettled promises
       .then (results) ->
-        # cull any failed promises
+        # cull any broken promises
+        results
+          .filter (v) -> v.state is 'fulfilled'
+          .map (v) -> v.value
+    , (pages) -> # create a promise to fetch details for each ingredient
+      # first, merge pages of ingredients back into a single array
+      ingredients = []
+      ingredients = ingredients.concat.apply ingredients, pages
+
+      console.log "found #{ingredients.length} ingredients in total"
+
+      promises = []
+      promises.push(fetchDetails(ingredient, ingredients.length)) for ingredient in ingredients
+
+      p.allSettled promises
+      .then (results) ->
+        # cull any broken promises
         results
           .filter (v) -> v.state is 'fulfilled'
           .map (v) -> v.value
