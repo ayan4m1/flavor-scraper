@@ -9,17 +9,19 @@ lib = glob('lib')
 src = glob('src')
 test = glob('test')
 
-gulp.task 'build', ->
+gulp.task('build', ->
   gulp.src([lib, src])
   .pipe(coffee({ bare: true }))
   .pipe(gulp.dest('dist/'))
+)
 
-gulp.task 'lint', ->
+gulp.task('lint', ->
   gulp.src(lib)
   .pipe(lint())
   .pipe(lint.reporter())
+)
 
-gulp.task 'test', ['build'], ->
+gulp.task('test', gulp.series('build', ->
   gulp.src(lib)
   .pipe(istanbul({ includeUntested: true }))
   .pipe(istanbul.hookRequire())
@@ -27,5 +29,6 @@ gulp.task 'test', ['build'], ->
     gulp.src(test)
     .pipe(jasmine())
     .pipe(istanbul.writeReports())
+))
 
-gulp.task 'default', ['lint', 'build', 'test']
+gulp.task 'default', gulp.series('lint', 'build', 'test')
